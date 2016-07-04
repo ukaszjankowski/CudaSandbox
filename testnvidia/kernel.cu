@@ -43,7 +43,7 @@ __global__ void ContrastKernel(pixel *data, float contrast)
 
 int main()
 {
-    const int arraySize = 1;
+    const int arraySize = 1024;
 	pixel *data = (pixel*)malloc(arraySize * sizeof(pixel));
 
 	cudaError_t cudaStatus;
@@ -55,11 +55,24 @@ int main()
 		data[i].b = 30;
 	}
 
-	//for (long i = 0; i < 100000 ; i++) {
-		cudaStatus = Grayscale(data, arraySize);
-	//}
+	time_t cudaStartTime = time(NULL);
+	cudaStatus = Grayscale(data, arraySize);
+	time_t cudaEndTime = time(NULL);
+	printf("GPU: %i\n", cudaEndTime - cudaStartTime);
 
-	printf("Pixel: %d\n", data[0].gray);
+	time_t cpuStartTime = time(NULL);
+	for (size_t i = 0; i < 1000000; i++) {
+		for (size_t j = 0; j < arraySize; j++)
+		{
+			data[j].gray = RED_FACTOR   * data[j].r
+						 + GREEN_FACTOR * data[j].g
+						 + BLUE_FACTOR  * data[j].b;
+		}
+	}
+	time_t cpuEndTime = time(NULL);
+	printf("CPU (single thread): %i\n", cpuEndTime - cpuStartTime);
+
+	//printf("Pixel: %d\n", data[0].gray);
 
 	if (cudaStatus != cudaSuccess) {
         fprintf(stderr, "Cuda failed!");
@@ -96,7 +109,9 @@ __declspec(dllexport) cudaError_t Grayscale(pixel *data, unsigned int size)
 	if (cudaStatus != cudaSuccess) return CudaFail("cudaMemcpy failed!\n", data, cudaStatus);
 
     // Launch a kernel on the GPU with one thread for each element.
-	GrayscaleKernel<< <1, size >> >(dev_data);
+	for (int i = 0; i < 1000000; i++) {
+		GrayscaleKernel<<<1, size >>>(dev_data);
+	}
 
     // Check for any errors launching the kernel
     cudaStatus = cudaGetLastError();
